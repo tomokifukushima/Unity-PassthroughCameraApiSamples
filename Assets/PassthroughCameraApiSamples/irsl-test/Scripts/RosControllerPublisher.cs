@@ -153,17 +153,6 @@ namespace PassthroughCameraSamples.IrslTest
             m_webSocket.SendText(msg);
         }
 
-        private void OnGUI()
-        {
-            var style = new GUIStyle(GUI.skin.box)
-            {
-                fontSize = 28,
-                alignment = TextAnchor.UpperLeft
-            };
-            style.normal.textColor = Color.white;
-            GUI.Box(new Rect(10, 80, 700, 60), $"Controller WS: {m_debugStatus}", style);
-        }
-
         private async void OnDestroy()
         {
             if (m_webSocket != null && m_webSocket.State == WebSocketState.Open)

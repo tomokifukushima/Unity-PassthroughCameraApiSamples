@@ -12,7 +12,7 @@ namespace PassthroughCameraSamples.IrslTest
     /// PassthroughCameraAccess のカメラ映像を rosbridge_websocket 経由で
     /// sensor_msgs/CompressedImage (JPEG) として ROS 1 トピックに配信する。
     /// </summary>
-    public class RosBridgePublisher : MonoBehaviour
+    public class RosCameraBridgePublisher : MonoBehaviour
     {
         [Header("Camera")]
         [SerializeField] private PassthroughCameraAccess m_cameraAccess;
@@ -145,17 +145,6 @@ namespace PassthroughCameraSamples.IrslTest
 
             m_webSocket.SendText(msg);
             m_debugStatus = $"Publishing seq={m_seq - 1} to {m_topicName}";
-        }
-
-        private void OnGUI()
-        {
-            var style = new GUIStyle(GUI.skin.box)
-            {
-                fontSize = 28,
-                alignment = TextAnchor.UpperLeft
-            };
-            style.normal.textColor = Color.white;
-            GUI.Box(new Rect(10, 10, 700, 60), $"ROS WS: {m_debugStatus}", style);
         }
 
         private async void OnDestroy()
