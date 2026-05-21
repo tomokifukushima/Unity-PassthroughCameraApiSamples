@@ -19,3 +19,7 @@ PerformanceTestRun*.*
 StreamingAssets*
 buildInfo.txt
 Packages/packages-lock.json
+_Recovery/
+Assets/_Recovery/
+Assets/_Recovery.meta
+passthroughcamera_BurstDebugInformation_DoNotShip/
