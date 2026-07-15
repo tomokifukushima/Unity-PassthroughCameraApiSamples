@@ -2000,7 +2000,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosBridgePublisher
   m_cameraAccess: {fileID: 1608124433}
-  m_rosBridgeUrl: ws://133.15.97.117:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_topicName: /quest_camera/compressed
   m_frameId: quest_camera
   m_publishRateHz: 10
@@ -2032,7 +2032,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abc59d3ebaf3a4e4aad5ddee1485892e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosControllerPublisher
-  m_rosBridgeUrl: ws://133.15.97.117:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_frameId: tracking
   m_publishRateHz: 30
 --- !u!1660057539 &9223372036854775807
