@@ -56,8 +56,9 @@ namespace PassthroughCameraSamples.IrslTest
 
         private IEnumerator Start()
         {
+            // RosControllerPublisher と同時接続を避けるため少し遅らせる
+            yield return new WaitForSeconds(2f);
             ConnectAsync();
-            yield break;
         }
 
         private async void ConnectAsync()

@@ -1185,6 +1185,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: CameraViewerManagerPrefab
       objectReference: {fileID: 0}
+    - target: {fileID: 5325651034816108330, guid: 0e9e59a9b5566489fad35afecaeac3a9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6182922352048559143, guid: 0e9e59a9b5566489fad35afecaeac3a9, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -2035,6 +2039,7 @@ MonoBehaviour:
   m_rosBridgeUrl: ws://133.15.97.58:9090
   m_frameId: tracking
   m_publishRateHz: 30
+  m_jointStateTopic: /divided_robot/joint_states
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

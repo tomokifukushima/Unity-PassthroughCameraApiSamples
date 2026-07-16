@@ -41,6 +41,17 @@ namespace PassthroughCameraSamples.IrslTest
         private string m_debugStatus = "Not started";
         private int m_publishCount = 0;
 
+        // JointState 購読用
+        [Header("Subscribe: JointState")]
+        [SerializeField] private string m_jointStateTopic = "/divided_robot/joint_states";
+        private string[] m_jointNames = new string[0];
+        private float[] m_jointPositions = new float[0];
+        private float m_lastJointReceiveTime = -999f;
+        private int m_jointLogCount = 0;
+
+        [Serializable] private class JointStateMsg { public string[] name; public float[] position; }
+        [Serializable] private class RosbridgeMsg   { public string op; public JointStateMsg msg; }
+
         private IEnumerator Start()
         {
             m_debugStatus = "Connecting...";
@@ -73,6 +84,35 @@ namespace PassthroughCameraSamples.IrslTest
                 Debug.Log($"[RosControllerPublisher] 切断: {e}");
             };
 
+            m_webSocket.OnMessage += (bytes) =>
+            {
+                var json = System.Text.Encoding.UTF8.GetString(bytes);
+                try
+                {
+                    var parsed = JsonUtility.FromJson<RosbridgeMsg>(json);
+                    if (parsed?.op == "publish" && parsed.msg != null)
+                    {
+                        m_jointNames     = parsed.msg.name     ?? new string[0];
+                        m_jointPositions = parsed.msg.position ?? new float[0];
+                        m_lastJointReceiveTime = Time.time;
+
+                        // 30回に1回だけログ出力
+                        if (m_jointNames.Length > 0 && ++m_jointLogCount % 30 == 0)
+                        {
+                            var sb = new System.Text.StringBuilder($"[JointState] #{m_jointLogCount}");
+                            int c = System.Math.Min(m_jointNames.Length, m_jointPositions.Length);
+                            for (int i = 0; i < c; i++)
+                                sb.Append($" {m_jointNames[i]}={m_jointPositions[i]:F3}");
+                            Debug.Log(sb.ToString());
+                        }
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[RosControllerPublisher] OnMessage parse error: {e.Message}");
+                }
+            };
+
             await m_webSocket.Connect();
         }
 
@@ -82,6 +122,10 @@ namespace PassthroughCameraSamples.IrslTest
             Advertise("/quest/left_controller/pose",  "geometry_msgs/PoseStamped");
             Advertise("/quest/right_controller/joy",  "sensor_msgs/Joy");
             Advertise("/quest/left_controller/joy",   "sensor_msgs/Joy");
+            // joint_states 購読
+            m_webSocket.SendText(
+                $"{{\"op\":\"subscribe\",\"topic\":\"{m_jointStateTopic}\",\"type\":\"sensor_msgs/JointState\"}}");
+            Debug.Log($"[RosControllerPublisher] subscribe: {m_jointStateTopic}");
         }
 
         private void Advertise(string topic, string type)
@@ -93,6 +137,7 @@ namespace PassthroughCameraSamples.IrslTest
         private void Update()
         {
             m_webSocket?.DispatchMessageQueue();
+            UpdateDebugPanel();
 
             if (!m_isConnected) return;
             if (Time.time < m_nextPublishTime) return;
@@ -157,6 +202,67 @@ namespace PassthroughCameraSamples.IrslTest
         {
             if (m_webSocket != null && m_webSocket.State == WebSocketState.Open)
                 await m_webSocket.Close();
+        }
+
+        // ---- World Space Debug Panel (TextMesh) ----
+        private TextMesh m_debugText;
+        private Transform m_panelRoot;
+
+        private void CreateDebugPanel()
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogWarning("[RosControllerPublisher] Camera.main is null, retrying next frame");
+                return;
+            }
+
+            var go = new GameObject("DebugPanel");
+            go.transform.SetParent(cam.transform, false);
+            // 右上・1m前方
+            go.transform.localPosition = new Vector3(0.3f, 0.1f, 1.0f);
+            go.transform.localRotation = Quaternion.Euler(0f, 17f, 0f);
+            go.transform.localScale    = Vector3.one * 0.002f;
+
+            m_debugText           = go.AddComponent<TextMesh>();
+            m_debugText.fontSize  = 120;
+            m_debugText.color     = Color.yellow;
+            m_debugText.anchor    = TextAnchor.UpperLeft;
+            m_debugText.alignment = TextAlignment.Left;
+            m_debugText.text      = "Initializing...";
+
+            m_panelRoot = go.transform;
+            Debug.Log("[RosControllerPublisher] DebugPanel created");
+        }
+
+        private void UpdateDebugPanel()
+        {
+            if (m_debugText == null)
+            {
+                CreateDebugPanel();
+                return;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[ROS] {m_debugStatus}");
+
+            if (m_jointNames.Length == 0)
+            {
+                sb.AppendLine("[JointState] Waiting for data...");
+            }
+            else
+            {
+                float age = Time.time - m_lastJointReceiveTime;
+                sb.AppendLine($"[JointState] {age:F1}s ago");
+                int count = Mathf.Min(m_jointNames.Length, m_jointPositions.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    float deg = m_jointPositions[i] * Mathf.Rad2Deg;
+                    sb.AppendLine($"  {m_jointNames[i]}: {m_jointPositions[i]:F3} ({deg:F1}deg)");
+                }
+            }
+
+            m_debugText.text = sb.ToString();
         }
     }
 }
