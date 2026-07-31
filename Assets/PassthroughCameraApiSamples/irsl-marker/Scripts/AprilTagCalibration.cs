@@ -29,7 +29,7 @@ namespace PassthroughCameraSamples.IrslMarker
         [SerializeField] private int m_targetTagId = 0;
         [Tooltip("処理を間引く倍率。大きいほど速いが精度低下。1 or 2 を推奨")]
         [Range(1, 4)]
-        [SerializeField] private int m_decimation = 4;
+        [SerializeField] private int m_decimation = 2;
         [Tooltip("検出処理の実行レート（Hz）。高いほど負荷大")]
         [Range(1, 15)]
         [SerializeField] private int m_detectionRateHz = 5;
@@ -106,6 +106,8 @@ namespace PassthroughCameraSamples.IrslMarker
 
         private void Update()
         {
+            UpdateDebugPanel();
+
             if (m_detector == null || !m_cameraAccess.IsPlaying)
             {
                 if (Time.frameCount % 300 == 0)
@@ -270,9 +272,36 @@ namespace PassthroughCameraSamples.IrslMarker
             m_detector?.Dispose();
         }
 
-        private void OnGUI()
+        // ---- WorldSpace デバッグパネル ----
+        private TextMesh m_debugText;
+
+        private void CreateDebugPanel()
         {
-            GUI.Label(new Rect(10, 10, 500, 30), $"[AprilTag] {m_statusText}");
+            var cam = Camera.main;
+            if (cam == null) return;
+
+            var go = new GameObject("AprilTagDebugPanel");
+            go.transform.SetParent(cam.transform, false);
+            go.transform.localPosition = new Vector3(-0.3f, 0.1f, 1.0f);
+            go.transform.localRotation = Quaternion.Euler(0f, -17f, 0f);
+            go.transform.localScale    = Vector3.one * 0.002f;
+
+            m_debugText           = go.AddComponent<TextMesh>();
+            m_debugText.fontSize  = 120;
+            m_debugText.color     = Color.cyan;
+            m_debugText.anchor    = TextAnchor.UpperLeft;
+            m_debugText.alignment = TextAlignment.Left;
+            m_debugText.text      = "[AprilTag] Starting...";
+        }
+
+        private void UpdateDebugPanel()
+        {
+            if (m_debugText == null)
+            {
+                CreateDebugPanel();
+                return;
+            }
+            m_debugText.text = $"[AprilTag]\n{m_statusText}";
         }
     }
 }

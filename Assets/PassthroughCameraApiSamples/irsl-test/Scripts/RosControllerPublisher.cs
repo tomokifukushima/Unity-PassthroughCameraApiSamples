@@ -41,6 +41,10 @@ namespace PassthroughCameraSamples.IrslTest
         private string m_debugStatus = "Not started";
         private int m_publishCount = 0;
 
+        [Header("Calibration")]
+        [Tooltip("CalibrationManager をアタッチした GameObject を割り当てる (省略可)")]
+        [SerializeField] private CalibrationManager m_calibrationManager;
+
         // JointState 購読用
         [Header("Subscribe: JointState")]
         [SerializeField] private string m_jointStateTopic = "/divided_robot/joint_states";
@@ -139,6 +143,9 @@ namespace PassthroughCameraSamples.IrslTest
             m_webSocket?.DispatchMessageQueue();
             UpdateDebugPanel();
 
+            // キャリブレーション編集中は ROS 送信を抑制 (誤ったコマンドをロボットに送らないため)
+            if (m_calibrationManager != null && m_calibrationManager.IsSuppressingPublish) return;
+
             if (!m_isConnected) return;
             if (Time.time < m_nextPublishTime) return;
 
@@ -162,6 +169,10 @@ namespace PassthroughCameraSamples.IrslTest
         {
             var pos = OVRInput.GetLocalControllerPosition(controller);
             var rot = OVRInput.GetLocalControllerRotation(controller);
+
+            // キャリブレーションが設定されている場合は座標変換を適用する
+            if (m_calibrationManager != null)
+                (pos, rot) = m_calibrationManager.Transform(pos, rot);
 
             string F(float v) => v.ToString("F6", CultureInfo.InvariantCulture);
 
@@ -245,6 +256,8 @@ namespace PassthroughCameraSamples.IrslTest
 
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"[ROS] {m_debugStatus}");
+            if (m_calibrationManager != null)
+                sb.AppendLine(m_calibrationManager.StatusText);
 
             if (m_jointNames.Length == 0)
             {
