@@ -7,11 +7,12 @@ using PassthroughCameraSamples.IrslMarker;
 namespace PassthroughCameraSamples.IrslTest
 {
     /// <summary>
-    /// 手動キャリブレーション (Calibration) と
-    /// マーカーキャリブレーション (AprilTagCalibration) を統合管理する。
+    /// 手動キャリブレーション (Calibration) ・
+    /// マーカーキャリブレーション (AprilTagCalibration) ・
+    /// 3点キャリブレーション (ThreePointCalibration) を統合管理する。
     ///
     /// ボタン操作:
-    ///   Y + B 同時押し … Manual / Marker モード切り替え
+    ///   Y + B 同時押し … Manual → Marker → ThreePoint → Manual サイクル
     ///
     ///   [Manual モード]
     ///     X + A … 手動編集モード ON/OFF (編集中は ROS 送信を停止)
@@ -19,16 +20,19 @@ namespace PassthroughCameraSamples.IrslTest
     ///
     ///   [Marker モード]
     ///     A ボタン … 現在検出中のマーカーでキャリブレーションを確定
-    ///     (ROS 送信は止めない。カメラがマーカーを検出するまで変換はパススルー)
+    ///
+    ///   [ThreePoint モード]
+    ///     A ボタン … 現在の右コントローラー位置を基準点として記録
+    ///     X ボタン … キャリブレーションやり直し
+    ///     (3点記録中は ROS 送信を停止)
     ///
     /// セットアップ:
-    ///   1. CalibrationRoot (Calibration.cs) と AprilTagCalibration を持つ
-    ///      GameObject をそれぞれ Inspector に割り当てる。
-    ///   2. RosControllerPublisher の M Calibration Manager に本コンポーネントを割り当てる。
+    ///   各キャリブレーションコンポーネントを Inspector に割り当てる。
+    ///   RosControllerPublisher の M Calibration Manager に本コンポーネントを割り当てる。
     /// </summary>
     public class CalibrationManager : MonoBehaviour
     {
-        public enum CalibMode { Manual, Marker }
+        public enum CalibMode { Manual, Marker, ThreePoint }
 
         [Header("Calibration Sources")]
         [Tooltip("手動キャリブレーション (Calibration.cs をアタッチした GameObject)")]
@@ -36,6 +40,9 @@ namespace PassthroughCameraSamples.IrslTest
 
         [Tooltip("マーカーキャリブレーション (AprilTagCalibration.cs をアタッチした GameObject)")]
         [SerializeField] private AprilTagCalibration m_marker;
+
+        [Tooltip("3点キャリブレーション (ThreePointCalibration.cs をアタッチした GameObject)")]
+        [SerializeField] private ThreePointCalibration m_threePoint;
 
         [Header("Active Mode (Runtime)")]
         [SerializeField] private CalibMode m_mode = CalibMode.Manual;
@@ -45,8 +52,9 @@ namespace PassthroughCameraSamples.IrslTest
 
         // -------------------------------------------------------
 
-        /// <summary>手動編集中かどうか (true のとき ROS 送信を抑制すべき)</summary>
-        public bool IsSuppressingPublish => m_manualEditing;
+        /// <summary>手動編集中 or 3点収集中は送信を抑制</summary>
+        public bool IsSuppressingPublish => m_manualEditing ||
+            (m_mode == CalibMode.ThreePoint && m_threePoint != null && m_threePoint.IsCollecting);
 
         /// <summary>デバッグパネル用ステータス文字列</summary>
         public string StatusText { get; private set; } = "";
@@ -66,8 +74,10 @@ namespace PassthroughCameraSamples.IrslTest
 
             if (m_mode == CalibMode.Manual)
                 HandleManualMode();
-            else
+            else if (m_mode == CalibMode.Marker)
                 HandleMarkerMode();
+            else
+                HandleThreePointMode();
         }
 
         private void HandleManualMode()
@@ -115,7 +125,13 @@ namespace PassthroughCameraSamples.IrslTest
                 m_manual?.SwitchAlign(false);
             }
 
-            m_mode = (m_mode == CalibMode.Manual) ? CalibMode.Marker : CalibMode.Manual;
+            // Manual → Marker → ThreePoint → Manual のサイクル
+            m_mode = (CalibMode)(((int)m_mode + 1) % 3);
+
+            // ThreePoint に切り替えたときは自動でキャリブレーション開始
+            if (m_mode == CalibMode.ThreePoint)
+                m_threePoint?.StartCalibration();
+
             Debug.Log($"[CalibrationManager] Mode → {m_mode}");
         }
 
@@ -139,10 +155,16 @@ namespace PassthroughCameraSamples.IrslTest
                 if (m_manual == null) return (trackingPos, trackingRot);
                 return (m_manual.GetPosition(trackingPos), m_manual.GetRotation(trackingRot));
             }
-            else // Marker
+            else if (m_mode == CalibMode.Marker)
             {
                 if (m_marker == null || !m_marker.IsCalibrated) return (trackingPos, trackingRot);
                 var pose = m_marker.TransformToRobot(trackingPos, trackingRot);
+                return (pose.position, pose.rotation);
+            }
+            else // ThreePoint
+            {
+                if (m_threePoint == null || !m_threePoint.IsCalibrated) return (trackingPos, trackingRot);
+                var pose = m_threePoint.TransformToRobot(trackingPos, trackingRot);
                 return (pose.position, pose.rotation);
             }
         }
