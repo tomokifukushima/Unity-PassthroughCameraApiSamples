@@ -20,18 +20,29 @@ namespace PassthroughCameraSamples.IrslTest
     /// Joy axes  : [thumbstick_x, thumbstick_y, index_trigger, hand_trigger]
     /// Joy buttons: [A(X), B(Y), thumbstick_click, menu(left only)]
     ///
-    /// 座標系: Unity (左手系 Y-up)。ROS 側で必要に応じて変換してください。
+    /// 座標系: ROS 規約 (右手系 Z-up, X前 Y左)。
+    ///   固定変換 (Unity Y-up 左手系 → ROS Z-up 右手系) を常に適用したうえで
+    ///   CalibrationManager による動的補正（3点キャリブ等）を重ねる。
+    ///   3点キャリブの Robot Point は Unity 座標規約 (Y-up) で設定すること。
     /// </summary>
     public class RosControllerPublisher : MonoBehaviour
     {
         [Header("ROS Bridge")]
         [Tooltip("例: ws://133.15.97.117:9090")]
-        [SerializeField] private string m_rosBridgeUrl = "ws://133.15.97.117:9090";
+        [SerializeField] private string m_rosBridgeUrl = "ws://133.15.97.78:9090";
         [SerializeField] private string m_frameId = "tracking";
 
         [Header("Publish Settings")]
         [Range(1, 90)]
         [SerializeField] private int m_publishRateHz = 30;
+
+        [Header("3-Axis Test Log")]
+        [Tooltip("右コントローラの3軸テスト用ログを有効化する")]
+        [SerializeField] private bool m_enableAxisTestLog = false;
+        [Tooltip("3軸テストログの最短出力間隔（秒）")]
+        [SerializeField] private float m_axisLogIntervalSec = 0.4f;
+        [Tooltip("この距離以上動いたときだけ3軸テストログを出力（m）")]
+        [SerializeField] private float m_axisLogMoveThreshold = 0.02f;
 
         private WebSocket m_webSocket;
         private bool m_isConnected = false;
@@ -40,6 +51,10 @@ namespace PassthroughCameraSamples.IrslTest
         private float m_nextPublishTime = 0f;
         private string m_debugStatus = "Not started";
         private int m_publishCount = 0;
+        private float m_nextCalibStatusTime = 0f;
+        private float m_nextAxisLogTime = 0f;
+        private Vector3 m_prevRightRawPos;
+        private bool m_hasPrevRightRawPos = false;
 
         [Header("Calibration")]
         [Tooltip("CalibrationManager をアタッチした GameObject を割り当てる (省略可)")]
@@ -126,6 +141,7 @@ namespace PassthroughCameraSamples.IrslTest
             Advertise("/quest/left_controller/pose",  "geometry_msgs/PoseStamped");
             Advertise("/quest/right_controller/joy",  "sensor_msgs/Joy");
             Advertise("/quest/left_controller/joy",   "sensor_msgs/Joy");
+            Advertise("/quest/calibration_status",    "std_msgs/String");
             // joint_states 購読
             m_webSocket.SendText(
                 $"{{\"op\":\"subscribe\",\"topic\":\"{m_jointStateTopic}\",\"type\":\"sensor_msgs/JointState\"}}");
@@ -142,6 +158,9 @@ namespace PassthroughCameraSamples.IrslTest
         {
             m_webSocket?.DispatchMessageQueue();
             UpdateDebugPanel();
+
+            // キャリブレーション状態は接続中は常に送信 (抑制状態でも ROS 側が判断できるよう)
+            if (m_isConnected) PublishCalibStatus();
 
             // キャリブレーション編集中は ROS 送信を抑制 (誤ったコマンドをロボットに送らないため)
             if (m_calibrationManager != null && m_calibrationManager.IsSuppressingPublish) return;
@@ -167,12 +186,23 @@ namespace PassthroughCameraSamples.IrslTest
 
         private void PublishPose(string topic, OVRInput.Controller controller, ref int seq, long secs, long nsecs)
         {
-            var pos = OVRInput.GetLocalControllerPosition(controller);
-            var rot = OVRInput.GetLocalControllerRotation(controller);
+            var rawPos = OVRInput.GetLocalControllerPosition(controller);
+            var rawRot = OVRInput.GetLocalControllerRotation(controller);
+            var pos = rawPos;
+            var rot = rawRot;
 
-            // キャリブレーションが設定されている場合は座標変換を適用する
+            // キャリブレーションが設定されている場合は座標変換を適用する (Unity 座標系内で処理)
             if (m_calibrationManager != null)
                 (pos, rot) = m_calibrationManager.Transform(pos, rot);
+
+            var calibratedPos = pos;
+            var calibratedRot = rot;
+
+            // Unity 左手系 (Y-up) → ROS 右手系 (Z-up) へ固定変換
+            pos = UnityToRosPos(pos);
+            rot = UnityToRosRot(rot);
+
+            TryLogAxisTest(controller, rawPos, rawRot, calibratedPos, calibratedRot, pos, rot);
 
             string F(float v) => v.ToString("F6", CultureInfo.InvariantCulture);
 
@@ -185,6 +215,50 @@ namespace PassthroughCameraSamples.IrslTest
                 $"}}}}}}";
 
             m_webSocket.SendText(msg);
+        }
+
+        private void TryLogAxisTest(
+            OVRInput.Controller controller,
+            Vector3 rawPos,
+            Quaternion rawRot,
+            Vector3 calibratedPos,
+            Quaternion calibratedRot,
+            Vector3 rosPos,
+            Quaternion rosRot)
+        {
+            if (!m_enableAxisTestLog) return;
+            if (controller != OVRInput.Controller.RTouch) return;
+            if (Time.time < m_nextAxisLogTime) return;
+
+            if (m_hasPrevRightRawPos)
+            {
+                float moveDist = Vector3.Distance(rawPos, m_prevRightRawPos);
+                if (moveDist < m_axisLogMoveThreshold) return;
+            }
+
+            m_hasPrevRightRawPos = true;
+            m_prevRightRawPos = rawPos;
+            m_nextAxisLogTime = Time.time + Mathf.Max(0.05f, m_axisLogIntervalSec);
+
+            var rawX = rawRot * Vector3.right;
+            var rawY = rawRot * Vector3.up;
+            var rawZ = rawRot * Vector3.forward;
+
+            var calibX = calibratedRot * Vector3.right;
+            var calibY = calibratedRot * Vector3.up;
+            var calibZ = calibratedRot * Vector3.forward;
+
+            var rosX = rosRot * Vector3.right;
+            var rosY = rosRot * Vector3.up;
+            var rosZ = rosRot * Vector3.forward;
+
+            string V(Vector3 v) => $"({v.x:F3},{v.y:F3},{v.z:F3})";
+
+            Debug.Log(
+                "[AxisTest] RTouch\n" +
+                $" rawPos={V(rawPos)} rawAxes X={V(rawX)} Y={V(rawY)} Z={V(rawZ)}\n" +
+                $" calibPos={V(calibratedPos)} calibAxes X={V(calibX)} Y={V(calibY)} Z={V(calibZ)}\n" +
+                $" rosPos={V(rosPos)} rosAxes X={V(rosX)} Y={V(rosY)} Z={V(rosZ)}");
         }
 
         private void PublishJoy(string topic, OVRInput.Controller controller, bool isRight, long secs, long nsecs)
@@ -209,6 +283,33 @@ namespace PassthroughCameraSamples.IrslTest
             m_webSocket.SendText(msg);
         }
 
+        // ---- Unity → ROS 座標変換ユーティリティ ----
+        // Unity: 左手系 X右 Y上 Z前  →  ROS REP-103: 右手系 X前 Y左 Z上
+        private static Vector3    UnityToRosPos(Vector3    u) => new Vector3(u.z, -u.x, u.y);
+        private static Quaternion UnityToRosRot(Quaternion u) => new Quaternion(u.z, -u.x, u.y, -u.w);
+
+        // ---- キャリブレーション状態トピック (1 Hz) ----
+        private void PublishCalibStatus()
+        {
+            if (Time.time < m_nextCalibStatusTime) return;
+            m_nextCalibStatusTime = Time.time + 1f;
+
+            string mode        = "none";
+            string calibrated  = "0";
+            string suppressing = "0";
+
+            if (m_calibrationManager != null)
+            {
+                mode        = m_calibrationManager.CurrentMode.ToString();
+                calibrated  = m_calibrationManager.IsCalibrated       ? "1" : "0";
+                suppressing = m_calibrationManager.IsSuppressingPublish ? "1" : "0";
+            }
+
+            m_webSocket.SendText(
+                $"{{\"op\":\"publish\",\"topic\":\"/quest/calibration_status\"," +
+                $"\"msg\":{{\"data\":\"mode={mode},calibrated={calibrated},suppressing={suppressing}\"}}}}");
+        }
+
         private async void OnDestroy()
         {
             if (m_webSocket != null && m_webSocket.State == WebSocketState.Open)
@@ -218,6 +319,9 @@ namespace PassthroughCameraSamples.IrslTest
         // ---- World Space Debug Panel (TextMesh) ----
         private TextMesh m_debugText;
         private Transform m_panelRoot;
+
+        /// <summary>true のあいだデバッグパネルを非表示にする (CalibrationWizardUI から設定)</summary>
+        [System.NonSerialized] public bool HideDebugPanel = false;
 
         private void CreateDebugPanel()
         {
@@ -248,6 +352,15 @@ namespace PassthroughCameraSamples.IrslTest
 
         private void UpdateDebugPanel()
         {
+            // ウィザード表示中はデバッグパネルを隠す
+            if (HideDebugPanel)
+            {
+                if (m_panelRoot != null) m_panelRoot.gameObject.SetActive(false);
+                return;
+            }
+            if (m_panelRoot != null && !m_panelRoot.gameObject.activeSelf)
+                m_panelRoot.gameObject.SetActive(true);
+
             if (m_debugText == null)
             {
                 CreateDebugPanel();

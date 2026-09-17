@@ -1,6 +1,7 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 using System.Collections;
+using System.Runtime.InteropServices;
 using Meta.XR;
 using Unity.Collections;
 using UnityEngine;
@@ -33,10 +34,28 @@ namespace PassthroughCameraSamples.IrslMarker
         [Tooltip("検出処理の実行レート（Hz）。高いほど負荷大")]
         [Range(1, 15)]
         [SerializeField] private int m_detectionRateHz = 5;
+        [Tooltip("カメラ姿勢が不安定なフレームでは検出更新をスキップする")]
+        [SerializeField] private bool m_skipUnreliableCameraPose = true;
+
+        [Header("Marker -> Robot Base Offset")]
+        [Tooltip("マーカー中心座標系から見たロボットベース原点の位置オフセット（m）")]
+        [SerializeField] private Vector3 m_markerToRobotPosition = Vector3.zero;
+        [Tooltip("マーカー座標系から見たロボットベースの回転オフセット（deg, XYZ Euler）")]
+        [SerializeField] private Vector3 m_markerToRobotEulerDeg = Vector3.zero;
+        [Tooltip("マーカー軸をロボット軸へ写す符号マッピング。実測: (-1, -1, -1)")]
+        [SerializeField] private Vector3 m_markerToRobotAxisSign = new Vector3(-1f, -1f, -1f);
 
         [Header("Visualization")]
         [Tooltip("マーカー検出中に表示するオブジェクト。未設定なら自動生成（軸表示）")]
         [SerializeField] private GameObject m_markerIndicator;
+        [Tooltip("キャリブ完了後にロボットベース位置へ表示するオブジェクト。未設定なら軸表示を自動生成")]
+        [SerializeField] private GameObject m_robotBaseIndicator;
+        [Tooltip("ロボットベース軸表示の軸長（m）")]
+        [SerializeField] private float m_robotBaseAxisLength = 0.09f;
+        [Tooltip("ロボットベース軸表示の軸太さ（m）")]
+        [SerializeField] private float m_robotBaseAxisRadius = 0.007f;
+        [Tooltip("キャリブ完了後もタグが見えている間はベース姿勢を継続更新する")]
+        [SerializeField] private bool m_refreshCalibrationWhileVisible = true;
 
         [Header("Status (ReadOnly)")]
         [SerializeField] private bool m_isCalibrated = false;
@@ -47,6 +66,8 @@ namespace PassthroughCameraSamples.IrslMarker
 
         private TagDetector m_detector;
         private Color32[] m_colorBuffer;
+        private int m_detectorWidth = 0;
+        private int m_detectorHeight = 0;
         private float m_nextDetectionTime = 0f;
         private bool m_tagVisible = false;
 
@@ -92,15 +113,16 @@ namespace PassthroughCameraSamples.IrslMarker
             }
             Debug.Log($"[AprilTag] Resolution ready: {res.x}x{res.y}");
 
-            m_detector = new TagDetector(res.x, res.y, m_decimation);
-            m_colorBuffer = new Color32[res.x * res.y];
-            Debug.Log($"[AprilTag] Detector created. decimation={m_decimation}");
+            RecreateDetector(res.x, res.y);
 
             // Indicator が未設定なら軸表示オブジェクトを自動生成
             if (m_markerIndicator == null)
                 m_markerIndicator = CreateAxisIndicator();
+            if (m_robotBaseIndicator == null)
+                m_robotBaseIndicator = CreateRobotBaseIndicator();
 
             m_markerIndicator.SetActive(false);
+            m_robotBaseIndicator.SetActive(false);
             m_statusText = "Searching for tag...";
         }
 
@@ -164,6 +186,15 @@ namespace PassthroughCameraSamples.IrslMarker
 
             var intrinsics = m_cameraAccess.Intrinsics;
             var res = m_cameraAccess.CurrentResolution;
+
+            // 実行中に解像度が変化した場合に追従する
+            if (res.x != m_detectorWidth || res.y != m_detectorHeight)
+            {
+                RecreateDetector(res.x, res.y);
+                if (m_detector == null || m_colorBuffer == null)
+                    return;
+            }
+
             if (intrinsics.FocalLength.y == 0)
             {
                 Debug.Log($"[AprilTag] Intrinsics invalid: FocalLength={intrinsics.FocalLength}");
@@ -195,6 +226,15 @@ namespace PassthroughCameraSamples.IrslMarker
                 if (tag.ID != m_targetTagId) continue;
 
                 var tagLocalPose = new Pose(tag.Position, tag.Rotation);
+
+                if (m_skipUnreliableCameraPose && !IsCameraPoseReliable())
+                {
+                    m_statusText = "Camera pose unreliable. Skipped.";
+                    if (m_markerIndicator != null) m_markerIndicator.SetActive(false);
+                    m_tagVisible = false;
+                    return;
+                }
+
                 var cameraPose = m_cameraAccess.GetCameraPose();
 
                 var markerWorldPos = cameraPose.position + cameraPose.rotation * tagLocalPose.position;
@@ -206,6 +246,9 @@ namespace PassthroughCameraSamples.IrslMarker
                     m_markerIndicator.transform.SetPositionAndRotation(markerWorldPos, markerWorldRot);
                     m_markerIndicator.SetActive(true);
                 }
+
+                if (m_isCalibrated && m_refreshCalibrationWhileVisible)
+                    UpdateCalibrationPose(markerWorldPos, markerWorldRot, updateStatusText: false);
 
                 m_tagVisible = true;
                 found = true;
@@ -230,41 +273,105 @@ namespace PassthroughCameraSamples.IrslMarker
 
             var pos = m_markerIndicator.transform.position;
             var rot = m_markerIndicator.transform.rotation;
-            var T_tracking_robot = Matrix4x4.TRS(pos, rot, Vector3.one);
-            m_trackingToRobot = T_tracking_robot.inverse;
+
+            UpdateCalibrationPose(pos, rot, updateStatusText: true);
 
             m_isCalibrated = true;
-            m_statusText = $"Calibrated! Pos={pos:F3}";
-            Debug.Log($"[AprilTagCalibration] Locked. MarkerPos={pos}, MarkerRot={rot.eulerAngles}");
+            Debug.Log(
+                $"[AprilTagCalibration] Locked. MarkerPos={pos}, MarkerRot={rot.eulerAngles}, " +
+                $"OffsetPos={m_markerToRobotPosition}, OffsetEuler={m_markerToRobotEulerDeg}");
+        }
+
+        private void UpdateCalibrationPose(Vector3 markerWorldPos, Quaternion markerWorldRot, bool updateStatusText)
+        {
+            // 追跡空間で見たマーカー姿勢
+            var T_tracking_marker = Matrix4x4.TRS(markerWorldPos, markerWorldRot, Vector3.one);
+            // マーカー軸 -> ロボット軸の符号マッピング（必要なら反転を含む）
+            var T_marker_axisMap = Matrix4x4.Scale(m_markerToRobotAxisSign);
+            // マーカー座標系で見たロボットベース姿勢（Inspectorで設定）
+            var T_marker_robotOffset = Matrix4x4.TRS(
+                m_markerToRobotPosition,
+                Quaternion.Euler(m_markerToRobotEulerDeg),
+                Vector3.one);
+
+            // ロボットベース姿勢を合成して tracking->robot を構築
+            var T_tracking_robot = T_tracking_marker * T_marker_axisMap * T_marker_robotOffset;
+            m_trackingToRobot = T_tracking_robot.inverse;
+
+            if (m_robotBaseIndicator != null)
+            {
+                var robotBaseRot = ExtractRotationFromMatrix(T_tracking_robot);
+                m_robotBaseIndicator.transform.SetPositionAndRotation(
+                    T_tracking_robot.GetPosition(),
+                    robotBaseRot);
+                m_robotBaseIndicator.SetActive(true);
+            }
+
+            if (updateStatusText)
+                m_statusText = $"Calibrated! TagPos={markerWorldPos:F3} Offset={m_markerToRobotPosition:F3}";
         }
 
         /// <summary>トラッキング空間の位置・姿勢をロボット座標系に変換する</summary>
         public Pose TransformToRobot(Vector3 trackingPos, Quaternion trackingRot)
         {
             var mat = m_trackingToRobot * Matrix4x4.TRS(trackingPos, trackingRot, Vector3.one);
-            return new Pose(mat.GetPosition(), mat.rotation);
+            return new Pose(mat.GetPosition(), ExtractRotationFromMatrix(mat));
         }
+
+        /// <summary>
+        /// ロボット座標系（Unity規約）の位置をトラッキング空間へ逆変換する。
+        /// /tf 可視化でロボット各関節をVR空間へ戻すために使う。
+        /// </summary>
+        public Vector3 RobotToTrackingPos(Vector3 robotPos)
+            => m_trackingToRobot.inverse.MultiplyPoint3x4(robotPos);
 
         // X=赤, Y=緑, Z=青 の軸表示オブジェクトを生成
         private GameObject CreateAxisIndicator()
         {
             var root = new GameObject("MarkerIndicator");
-            CreateAxisArrow(root.transform, Vector3.right,   Quaternion.Euler(0, 0, -90), Color.red);
-            CreateAxisArrow(root.transform, Vector3.up,      Quaternion.identity,          Color.green);
-            CreateAxisArrow(root.transform, Vector3.forward, Quaternion.Euler(90, 0, 0),  Color.blue);
+            CreateAxisArrow(root.transform, Vector3.right,   Quaternion.Euler(0, 0, -90), Color.red,   0.05f, 0.005f);
+            CreateAxisArrow(root.transform, Vector3.up,      Quaternion.identity,          Color.green, 0.05f, 0.005f);
+            CreateAxisArrow(root.transform, Vector3.forward, Quaternion.Euler(90, 0, 0),  Color.blue,  0.05f, 0.005f);
             return root;
         }
 
-        private void CreateAxisArrow(Transform parent, Vector3 dir, Quaternion rot, Color color)
+        private GameObject CreateRobotBaseIndicator()
+        {
+            var root = new GameObject("RobotBaseIndicator");
+            CreateAxisArrow(root.transform, Vector3.right,   Quaternion.Euler(0, 0, -90), Color.red,   m_robotBaseAxisLength, m_robotBaseAxisRadius);
+            CreateAxisArrow(root.transform, Vector3.up,      Quaternion.identity,          Color.green, m_robotBaseAxisLength, m_robotBaseAxisRadius);
+            CreateAxisArrow(root.transform, Vector3.forward, Quaternion.Euler(90, 0, 0),  Color.blue,  m_robotBaseAxisLength, m_robotBaseAxisRadius);
+            return root;
+        }
+
+        private void CreateAxisArrow(Transform parent, Vector3 dir, Quaternion rot, Color color, float axisLength, float axisRadius)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             go.transform.SetParent(parent);
-            go.transform.localPosition = dir * 0.05f;
+            go.transform.localPosition = dir * axisLength;
             go.transform.localRotation = rot;
-            go.transform.localScale = new Vector3(0.005f, 0.05f, 0.005f);
+            go.transform.localScale = new Vector3(axisRadius, axisLength, axisRadius);
             Destroy(go.GetComponent<Collider>());
             var mat = new Material(Shader.Find("Standard")) { color = color };
             go.GetComponent<Renderer>().material = mat;
+        }
+
+        private static Quaternion ExtractRotationFromMatrix(Matrix4x4 mat)
+        {
+            var forward = mat.MultiplyVector(Vector3.forward);
+            var up = mat.MultiplyVector(Vector3.up);
+
+            if (forward.sqrMagnitude < 1e-8f || up.sqrMagnitude < 1e-8f)
+                return Quaternion.identity;
+
+            forward.Normalize();
+            up.Normalize();
+
+            // ほぼ平行な場合は直交化して安定化
+            if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.999f)
+                up = Vector3.ProjectOnPlane(up, forward).normalized;
+
+            return Quaternion.LookRotation(forward, up);
         }
 
         private void OnDestroy()
@@ -272,8 +379,41 @@ namespace PassthroughCameraSamples.IrslMarker
             m_detector?.Dispose();
         }
 
+        private void RecreateDetector(int width, int height)
+        {
+            if (width <= 0 || height <= 0)
+                return;
+
+            m_detector?.Dispose();
+            m_detector = new TagDetector(width, height, m_decimation);
+            m_colorBuffer = new Color32[width * height];
+            m_detectorWidth = width;
+            m_detectorHeight = height;
+            Debug.Log($"[AprilTag] Detector recreated: {width}x{height} decimation={m_decimation}");
+        }
+
+        private bool IsCameraPoseReliable()
+        {
+            try
+            {
+                return ovrp_GetNodePoseStateAtTime(OVRPlugin.GetTimeInSeconds(), OVRPlugin.Node.Head, out _).IsSuccess();
+            }
+            catch
+            {
+                // プラットフォーム差異などで判定不能な場合は従来挙動を維持
+                return true;
+            }
+        }
+
+        [DllImport("OVRPlugin", CallingConvention = CallingConvention.Cdecl)]
+        private static extern OVRPlugin.Result ovrp_GetNodePoseStateAtTime(
+            double time,
+            OVRPlugin.Node nodeId,
+            out OVRPlugin.PoseStatef nodePoseState);
+
         // ---- WorldSpace デバッグパネル ----
         private TextMesh m_debugText;
+        [System.NonSerialized] public bool HideDebugPanel = false;
 
         private void CreateDebugPanel()
         {
@@ -296,6 +436,16 @@ namespace PassthroughCameraSamples.IrslMarker
 
         private void UpdateDebugPanel()
         {
+            if (HideDebugPanel)
+            {
+                if (m_debugText != null)
+                    m_debugText.gameObject.SetActive(false);
+                return;
+            }
+
+            if (m_debugText != null && !m_debugText.gameObject.activeSelf)
+                m_debugText.gameObject.SetActive(true);
+
             if (m_debugText == null)
             {
                 CreateDebugPanel();

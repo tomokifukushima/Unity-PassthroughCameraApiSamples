@@ -19,7 +19,7 @@ namespace PassthroughCameraSamples.IrslTest
 
         [Header("ROS Bridge")]
         [Tooltip("例: ws://192.168.1.10:9090")]
-        [SerializeField] private string m_rosBridgeUrl = "ws://192.168.1.10:9090";
+        [SerializeField] private string m_rosBridgeUrl = "ws://133.15.97.78:9090";
         [SerializeField] private string m_topicName = "/quest_camera/compressed";
         [SerializeField] private string m_frameId = "quest_camera";
 

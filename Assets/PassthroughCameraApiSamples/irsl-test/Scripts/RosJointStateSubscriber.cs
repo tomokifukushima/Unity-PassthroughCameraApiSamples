@@ -18,7 +18,7 @@ namespace PassthroughCameraSamples.IrslTest
     {
         [Header("ROS Bridge")]
         [Tooltip("例: ws://133.15.97.117:9090")]
-        [SerializeField] private string m_rosBridgeUrl = "ws://133.15.97.117:9090";
+        [SerializeField] private string m_rosBridgeUrl = "ws://133.15.97.78:9090";
         [SerializeField] private string m_topic = "/divided_robot/joint_states";
 
         [Header("Display")]

@@ -48,6 +48,9 @@ namespace PassthroughCameraSamples.IrslTest
         /// <summary>キャリブレーション済みかどうか</summary>
         public bool IsCalibrated => m_state == State.Done;
 
+        /// <summary>現在の内部状態 (CalibrationWizardUI から利用)</summary>
+        public State CurrentState => m_state;
+
         /// <summary>現在点を収集中かどうか (true のとき ROS 送信を抑制)</summary>
         public bool IsCollecting =>
             m_state == State.Point0 || m_state == State.Point1 || m_state == State.Point2;
@@ -184,7 +187,7 @@ namespace PassthroughCameraSamples.IrslTest
             go.transform.localScale = Vector3.one * 0.025f;
             Destroy(go.GetComponent<Collider>());
 
-            var colors = new[] { Color.red, Color.green, Color.blue };
+            var colors = new[] { Color.red, Color.blue, Color.green };
             var mat = new Material(Shader.Find("Standard")) { color = colors[idx] };
             go.GetComponent<Renderer>().material = mat;
             m_indicators[idx] = go;
@@ -222,5 +225,12 @@ namespace PassthroughCameraSamples.IrslTest
         /// <summary>位置・回転をまとめてロボット座標系に変換する</summary>
         public Pose TransformToRobot(Vector3 pos, Quaternion rot)
             => new Pose(GetPosition(pos), GetRotation(rot));
+
+        /// <summary>
+        /// ロボット座標系 (Unity 規約) の位置をトラッキング空間に逆変換する。
+        /// VR 空間でのロボット関節ビジュアライズに使用。
+        /// </summary>
+        public Vector3 RobotToTrackingPos(Vector3 robotPos)
+            => m_trackingToRobot.inverse.MultiplyPoint3x4(robotPos);
     }
 }

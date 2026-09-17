@@ -59,6 +59,18 @@ namespace PassthroughCameraSamples.IrslTest
         /// <summary>デバッグパネル用ステータス文字列</summary>
         public string StatusText { get; private set; } = "";
 
+        /// <summary>現在のキャリブレーションモード (ROS ステータストピック用)</summary>
+        public CalibMode CurrentMode => m_mode;
+
+        /// <summary>
+        /// 現在モードでキャリブレーション済みか (ROS ステータストピック用)。
+        /// Manual は常に true、Marker/ThreePoint は各コンポーネントの状態に依存する。
+        /// </summary>
+        public bool IsCalibrated =>
+            m_mode == CalibMode.Marker     ? (m_marker     != null && m_marker.IsCalibrated)     :
+            m_mode == CalibMode.ThreePoint ? (m_threePoint != null && m_threePoint.IsCalibrated) :
+            true; // Manual は常にキャリブレーション済みとみなす
+
         // -------------------------------------------------------
 
         private void Update()
@@ -116,6 +128,25 @@ namespace PassthroughCameraSamples.IrslTest
             StatusText = $"[Marker] {calibState} | A=\u78ba\u5b9a | Y+B \u3067\u624b\u52d5\u30e2\u30fc\u30c9\u3078";
         }
 
+        private void HandleThreePointMode()
+        {
+            // 手動編集中なら終了
+            if (m_manualEditing)
+            {
+                m_manualEditing = false;
+                m_manual?.SwitchAlign(false);
+            }
+
+            if (m_threePoint == null)
+            {
+                StatusText = "[ThreePoint] ThreePointCalibration 未割り当て | Y+B でマーカーモードへ";
+                return;
+            }
+
+            m_threePoint.HandleInput();
+            StatusText = m_threePoint.StatusText;
+        }
+
         private void SwitchMode()
         {
             // 編集中なら編集を終了してからモード切り替え
@@ -167,6 +198,31 @@ namespace PassthroughCameraSamples.IrslTest
                 var pose = m_threePoint.TransformToRobot(trackingPos, trackingRot);
                 return (pose.position, pose.rotation);
             }
+        }
+
+        /// <summary>
+        /// CalibrationWizardUI がキャリブレーション完了後に呼ぶ。
+        /// モードを ThreePoint に設定し、CalibrationManager を再有効化できる状態にする。
+        /// </summary>
+        public void SetThreePointDone()
+        {
+            m_mode = CalibMode.ThreePoint;
+            m_manualEditing = false;
+            StatusText = m_threePoint != null ? m_threePoint.StatusText : "[ThreePoint] キャリブ完了";
+        }
+
+        /// <summary>
+        /// ロボット座標系 (ROS Z-up 右手系) の位置を
+        /// Unity トラッキング空間に逆変換する。
+        /// VR 空間でのロボット関節ビジュアライズ用。
+        /// </summary>
+        public Vector3 InverseTransformRobotPos(Vector3 robotPosUnity)
+        {
+            if (m_mode == CalibMode.Marker && m_marker != null && m_marker.IsCalibrated)
+                return m_marker.RobotToTrackingPos(robotPosUnity);
+            if (m_mode == CalibMode.ThreePoint && m_threePoint != null && m_threePoint.IsCalibrated)
+                return m_threePoint.RobotToTrackingPos(robotPosUnity);
+            return robotPosUnity; // キャリブ未完了の場合はそのまま返す
         }
     }
 }
