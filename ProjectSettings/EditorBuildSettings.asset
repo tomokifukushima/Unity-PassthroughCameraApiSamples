@@ -30,6 +30,12 @@ EditorBuildSettings:
     path: Assets/PassthroughCameraApiSamples/irsl-test2/irsl-test2.unity
     guid: 49e096914e218f940904fd696a2773d3
   - enabled: 1
+    path: Assets/PassthroughCameraApiSamples/irsl-ur5e-sim-test/irsl-ur5e-sim-test.unity
+    guid: b3a1e9550d4f4f8e9e8e8d8c2a14b7f1
+  - enabled: 1
+    path: Assets/PassthroughCameraApiSamples/irsl-UI-test/irsl-UI-test.unity
+    guid: c1b7ad2d6e8348c8b5cc6a2fbf86a7c9
+  - enabled: 1
     path: Assets/PassthroughCameraApiSamples/irsl-marker/irsl-marker.unity
     guid: fd4b8b2d750cda04d970143a6a3bc9c9
   m_configObjects:

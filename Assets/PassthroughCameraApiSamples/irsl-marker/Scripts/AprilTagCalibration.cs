@@ -44,6 +44,14 @@ namespace PassthroughCameraSamples.IrslMarker
         [SerializeField] private Vector3 m_markerToRobotEulerDeg = Vector3.zero;
         [Tooltip("マーカー軸をロボット軸へ写す符号マッピング。実測: (-1, -1, -1)")]
         [SerializeField] private Vector3 m_markerToRobotAxisSign = new Vector3(-1f, -1f, -1f);
+        [Tooltip("位置成分のみの符号補正（回転は変更しない）。例: 全軸反転は (-1,-1,-1)")]
+        [SerializeField] private Vector3 m_robotPositionSign = Vector3.one;
+        [Tooltip("マーカー軸Xを追加で反転する")]
+        [SerializeField] private bool m_invertMarkerAxisX = false;
+        [Tooltip("マーカー軸Yを追加で反転する")]
+        [SerializeField] private bool m_invertMarkerAxisY = false;
+        [Tooltip("マーカー軸Zを追加で反転する")]
+        [SerializeField] private bool m_invertMarkerAxisZ = false;
 
         [Header("Visualization")]
         [Tooltip("マーカー検出中に表示するオブジェクト。未設定なら自動生成（軸表示）")]
@@ -56,6 +64,8 @@ namespace PassthroughCameraSamples.IrslMarker
         [SerializeField] private float m_robotBaseAxisRadius = 0.007f;
         [Tooltip("キャリブ完了後もタグが見えている間はベース姿勢を継続更新する")]
         [SerializeField] private bool m_refreshCalibrationWhileVisible = true;
+        [Tooltip("true: マーカー回転をロボット軸の向きに使う / false: 軸はtracking基準で固定")]
+        [SerializeField] private bool m_useMarkerRotationForAxes = true;
 
         [Header("Status (ReadOnly)")]
         [SerializeField] private bool m_isCalibrated = false;
@@ -284,10 +294,11 @@ namespace PassthroughCameraSamples.IrslMarker
 
         private void UpdateCalibrationPose(Vector3 markerWorldPos, Quaternion markerWorldRot, bool updateStatusText)
         {
+            var markerRotForAxes = m_useMarkerRotationForAxes ? markerWorldRot : Quaternion.identity;
             // 追跡空間で見たマーカー姿勢
-            var T_tracking_marker = Matrix4x4.TRS(markerWorldPos, markerWorldRot, Vector3.one);
+            var T_tracking_marker = Matrix4x4.TRS(markerWorldPos, markerRotForAxes, Vector3.one);
             // マーカー軸 -> ロボット軸の符号マッピング（必要なら反転を含む）
-            var T_marker_axisMap = Matrix4x4.Scale(m_markerToRobotAxisSign);
+            var T_marker_axisMap = Matrix4x4.Scale(BuildAxisSignVector());
             // マーカー座標系で見たロボットベース姿勢（Inspectorで設定）
             var T_marker_robotOffset = Matrix4x4.TRS(
                 m_markerToRobotPosition,
@@ -315,7 +326,8 @@ namespace PassthroughCameraSamples.IrslMarker
         public Pose TransformToRobot(Vector3 trackingPos, Quaternion trackingRot)
         {
             var mat = m_trackingToRobot * Matrix4x4.TRS(trackingPos, trackingRot, Vector3.one);
-            return new Pose(mat.GetPosition(), ExtractRotationFromMatrix(mat));
+            var pos = Vector3.Scale(mat.GetPosition(), BuildPositionSignVector());
+            return new Pose(pos, ExtractRotationFromMatrix(mat));
         }
 
         /// <summary>
@@ -323,7 +335,10 @@ namespace PassthroughCameraSamples.IrslMarker
         /// /tf 可視化でロボット各関節をVR空間へ戻すために使う。
         /// </summary>
         public Vector3 RobotToTrackingPos(Vector3 robotPos)
-            => m_trackingToRobot.inverse.MultiplyPoint3x4(robotPos);
+        {
+            var unsignedPos = Vector3.Scale(robotPos, BuildPositionSignVector());
+            return m_trackingToRobot.inverse.MultiplyPoint3x4(unsignedPos);
+        }
 
         // X=赤, Y=緑, Z=青 の軸表示オブジェクトを生成
         private GameObject CreateAxisIndicator()
@@ -372,6 +387,28 @@ namespace PassthroughCameraSamples.IrslMarker
                 up = Vector3.ProjectOnPlane(up, forward).normalized;
 
             return Quaternion.LookRotation(forward, up);
+        }
+
+        private Vector3 BuildAxisSignVector()
+        {
+            float sx = GetAxisSign(m_markerToRobotAxisSign.x) * (m_invertMarkerAxisX ? -1f : 1f);
+            float sy = GetAxisSign(m_markerToRobotAxisSign.y) * (m_invertMarkerAxisY ? -1f : 1f);
+            float sz = GetAxisSign(m_markerToRobotAxisSign.z) * (m_invertMarkerAxisZ ? -1f : 1f);
+            return new Vector3(sx, sy, sz);
+        }
+
+        private static float GetAxisSign(float v)
+        {
+            if (Mathf.Abs(v) < 1e-6f) return 1f;
+            return v > 0f ? 1f : -1f;
+        }
+
+        private Vector3 BuildPositionSignVector()
+        {
+            return new Vector3(
+                GetAxisSign(m_robotPositionSign.x),
+                GetAxisSign(m_robotPositionSign.y),
+                GetAxisSign(m_robotPositionSign.z));
         }
 
         private void OnDestroy()

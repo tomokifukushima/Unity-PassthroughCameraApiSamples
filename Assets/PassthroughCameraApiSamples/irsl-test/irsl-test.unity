@@ -149,13 +149,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslMarker.AprilTagCalibration
   m_cameraAccess: {fileID: 1608124433}
-  m_tagSize: 0.126
+  m_tagSize: 0.125
   m_targetTagId: 0
   m_decimation: 2
-  m_detectionRateHz: 5
+  m_detectionRateHz: 10
+  m_skipUnreliableCameraPose: 1
   m_markerToRobotPosition: {x: 0, y: 0, z: 0}
   m_markerToRobotEulerDeg: {x: 0, y: 0, z: 0}
+  m_markerToRobotAxisSign: {x: 1, y: 1, z: 1}
+  m_robotPositionSign: {x: -1, y: -1, z: -1}
+  m_invertMarkerAxisX: 1
+  m_invertMarkerAxisY: 1
+  m_invertMarkerAxisZ: 1
   m_markerIndicator: {fileID: 0}
+  m_robotBaseIndicator: {fileID: 0}
+  m_robotBaseAxisLength: 0.09
+  m_robotBaseAxisRadius: 0.007
+  m_refreshCalibrationWhileVisible: 1
+  m_useMarkerRotationForAxes: 0
   m_isCalibrated: 0
   m_statusText: Not calibrated
 --- !u!4 &55703847
@@ -392,6 +403,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1662430601901559469, guid: d0abdd77712724b409bdd185b622ac7c, type: 3}
   m_PrefabInstance: {fileID: 202020201}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &282627835
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 282627836}
+  m_Layer: 0
+  m_Name: EE_Calibration_Flow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &282627836
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 282627835}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.00975, y: -0.04842, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &308588196
 GameObject:
   m_ObjectHideFlags: 0
@@ -735,6 +777,10 @@ MonoBehaviour:
   m_coord: {fileID: 2139336615}
   m_scaleMin: 0.1
   m_scaleStep: 0.1
+  m_running: 0
+  m_startPosRight: {x: 0, y: 0, z: 0}
+  m_startPosLeft: {x: 0, y: 0, z: 0}
+  m_startTransformPos: {x: 0, y: 0, z: 0}
 --- !u!4 &449501649
 Transform:
   m_ObjectHideFlags: 0
@@ -1516,55 +1562,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
---- !u!1 &1327062049
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1327062051}
-  - component: {fileID: 1327062050}
-  m_Layer: 0
-  m_Name: CalibrationWizardUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1327062050
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327062049}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d42a3bbc8a1150940ba84666fa9a124f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.CalibrationWizardUI
-  m_calibrationManager: {fileID: 0}
-  m_threePointCalibration: {fileID: 0}
-  m_panelDistance: 1.5
-  m_fontSize: 160
-  m_textScale: 0.002
---- !u!4 &1327062051
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327062049}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.06329, y: -0.32932, z: 0.16723}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1411766051
 GameObject:
   m_ObjectHideFlags: 0
@@ -1817,7 +1814,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1489611706}
   - component: {fileID: 1489611705}
-  - component: {fileID: 1489611707}
   m_Layer: 0
   m_Name: CalibrationManager
   m_TagString: Untagged
@@ -1837,10 +1833,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7c20411ecc87c546990f4453de85ffc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.CalibrationManager
-  m_manual: {fileID: 449501648}
+  m_manual: {fileID: 0}
   m_marker: {fileID: 55703846}
-  m_threePoint: {fileID: 1489611707}
-  m_mode: 0
+  m_threePoint: {fileID: 0}
+  m_mode: 1
+  m_cooldown: 0
+  m_manualEditing: 0
+  <StatusText>k__BackingField: 
 --- !u!4 &1489611706
 Transform:
   m_ObjectHideFlags: 0
@@ -1858,23 +1857,6 @@ Transform:
   - {fileID: 55703847}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1489611707
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1489611704}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 33f51d5f57f87b44d8111322f2ac4aec, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.ThreePointCalibration
-  m_robotPoint0: {x: 0, y: 0, z: 0}
-  m_robotPoint1: {x: 0.3, y: 0, z: 0}
-  m_robotPoint2: {x: 0, y: 0, z: 0.3}
-  m_state: 0
-  m_statusText: Idle
 --- !u!1 &1494685903
 GameObject:
   m_ObjectHideFlags: 0
@@ -2223,11 +2205,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosBridgePublisher
   m_cameraAccess: {fileID: 1608124433}
-  m_rosBridgeUrl: ws://133.15.97.78:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_topicName: /quest_camera/compressed
   m_frameId: quest_camera
   m_publishRateHz: 10
   m_jpegQuality: 75
+  m_debugStatus: Not started
+  m_isConnected: 0
+  m_seq: 0
+  m_nextPublishTime: 0
+  m_encodeTex: {fileID: 0}
 --- !u!4 &1866117589
 Transform:
   m_ObjectHideFlags: 0
@@ -2255,11 +2242,49 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abc59d3ebaf3a4e4aad5ddee1485892e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosControllerPublisher
-  m_rosBridgeUrl: ws://133.15.97.78:9090
-  m_frameId: tracking
+  m_rosBridgeUrl: ws://133.15.97.58:9090
+  m_frameId: LINK_0
   m_publishRateHz: 30
+  m_applyCalibrationTransform: 1
+  m_publishRawAndCalibratedDebugPoses: 1
+  m_rawFrameId: tracking
+  m_publishHmdPose: 1
+  m_hmdPoseTopic: /quest/hmd/pose
+  m_hmdRawPoseTopic: /quest/hmd/raw_pose
+  m_hmdCalibratedPoseTopic: /quest/hmd/calibrated_pose
+  m_publishHandPoses: 1
+  m_publishHandPinch: 1
+  m_rightHandPoseTopic: /quest/right_hand/pose
+  m_leftHandPoseTopic: /quest/left_hand/pose
+  m_rightHandPinchTopic: /quest/right_hand/pinch
+  m_leftHandPinchTopic: /quest/left_hand/pinch
+  m_enableAxisTestLog: 0
+  m_axisLogIntervalSec: 0.4
+  m_axisLogMoveThreshold: 0.02
+  m_enableCalibrationPoseLog: 1
+  m_includeHmdInCalibrationPoseLog: 1
+  m_isConnected: 0
+  m_seqRightPose: 0
+  m_seqLeftPose: 0
+  m_seqHmdPose: 0
+  m_seqRightHandPose: 0
+  m_seqLeftHandPose: 0
+  m_seqDebugPose: 0
+  m_nextPublishTime: 0
+  m_debugStatus: Not started
+  m_publishCount: 0
+  m_nextCalibStatusTime: 0
+  m_nextAxisLogTime: 0
+  m_prevRightRawPos: {x: 0, y: 0, z: 0}
+  m_hasPrevRightRawPos: 0
   m_calibrationManager: {fileID: 1489611705}
   m_jointStateTopic: /divided_robot/joint_states
+  m_jointNames: []
+  m_jointPositions: []
+  m_lastJointReceiveTime: -999
+  m_jointLogCount: 0
+  m_debugText: {fileID: 0}
+  m_panelRoot: {fileID: 0}
 --- !u!1 &2139336615
 GameObject:
   m_ObjectHideFlags: 0
@@ -2307,6 +2332,80 @@ Transform:
   m_Children: []
   m_Father: {fileID: 449501649}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2140010000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2140010002}
+  - component: {fileID: 2140010001}
+  m_Layer: 0
+  m_Name: RosRobotVisualizer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2140010001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2140010000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2be8184caf9a4fc4e922b77d60ef6a7c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosRobotVisualizer
+  m_rosBridgeUrl: ws://133.15.97.58:9090
+  m_jointStateTopic: /divided_robot/joint_states
+  m_robotBaseFrame: LINK_0
+  m_trackedJoints:
+  - linkFrameName: LINK_0
+    jointName: LINK_0
+    maxTorque: 400
+  - linkFrameName: LINK_1
+    jointName: LINK_1
+    maxTorque: 400
+  - linkFrameName: LINK_2
+    jointName: LINK_2
+    maxTorque: 400
+  - linkFrameName: LINK_3
+    jointName: LINK_3
+    maxTorque: 400
+  - linkFrameName: LINK_4
+    jointName: LINK_4
+    maxTorque: 400
+  - linkFrameName: LINK_5
+    jointName: LINK_5
+    maxTorque: 400
+  - linkFrameName: LINK_6
+    jointName: LINK_6
+    maxTorque: 400
+  m_sphereRadius: 0.02
+  m_calibrationManager: {fileID: 1489611705}
+  m_spheres: []
+  m_materials: []
+  m_isConnected: 0
+--- !u!4 &2140010002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2140010000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2317,5 +2416,6 @@ SceneRoots:
   - {fileID: 1608124431}
   - {fileID: 717028859}
   - {fileID: 1866117589}
-  - {fileID: 1327062051}
   - {fileID: 1489611706}
+  - {fileID: 2140010002}
+  - {fileID: 282627836}

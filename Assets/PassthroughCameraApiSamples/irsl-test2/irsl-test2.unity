@@ -149,15 +149,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslMarker.AprilTagCalibration
   m_cameraAccess: {fileID: 1608124433}
-  m_tagSize: 0.126
+  m_tagSize: 0.125
   m_targetTagId: 0
   m_decimation: 2
   m_detectionRateHz: 10
-  m_markerToRobotPosition: {x: 0.19, y: -0.07, z: 0}
+  m_skipUnreliableCameraPose: 1
+  m_markerToRobotPosition: {x: 0, y: 0, z: 0}
   m_markerToRobotEulerDeg: {x: 0, y: 0, z: 0}
+  m_markerToRobotAxisSign: {x: 1, y: 1, z: 1}
+  m_robotPositionSign: {x: -1, y: -1, z: -1}
+  m_useMarkerRotationForAxes: 0
+  m_invertMarkerAxisX: 1
+  m_invertMarkerAxisY: 1
+  m_invertMarkerAxisZ: 1
   m_markerIndicator: {fileID: 0}
   m_robotBaseIndicator: {fileID: 0}
-  m_robotBaseIndicatorRadius: 0.03
+  m_robotBaseAxisLength: 0.09
+  m_robotBaseAxisRadius: 0.007
+  m_refreshCalibrationWhileVisible: 1
   m_isCalibrated: 0
   m_statusText: Not calibrated
 --- !u!4 &55703847
@@ -2158,7 +2167,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosBridgePublisher
   m_cameraAccess: {fileID: 1608124433}
-  m_rosBridgeUrl: ws://133.15.97.78:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_topicName: /quest_camera/compressed
   m_frameId: quest_camera
   m_publishRateHz: 10
@@ -2190,9 +2199,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abc59d3ebaf3a4e4aad5ddee1485892e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosControllerPublisher
-  m_rosBridgeUrl: ws://133.15.97.78:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_frameId: LINK_0
   m_publishRateHz: 30
+  m_applyCalibrationTransform: 1
+  m_publishRawAndCalibratedDebugPoses: 1
+  m_rawFrameId: tracking
+  m_publishHmdPose: 1
+  m_hmdPoseTopic: /quest/hmd/pose
+  m_hmdRawPoseTopic: /quest/hmd/raw_pose
+  m_hmdCalibratedPoseTopic: /quest/hmd/calibrated_pose
+  m_enableAxisTestLog: 0
+  m_axisLogIntervalSec: 0.4
+  m_axisLogMoveThreshold: 0.02
+  m_enableCalibrationPoseLog: 1
+  m_includeHmdInCalibrationPoseLog: 1
   m_calibrationManager: {fileID: 1489611705}
   m_jointStateTopic: /divided_robot/joint_states
 --- !u!1 &2139336615
@@ -2271,7 +2292,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2be8184caf9a4fc4e922b77d60ef6a7c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughCameraSamples.IrslTest.RosRobotVisualizer
-  m_rosBridgeUrl: ws://133.15.97.78:9090
+  m_rosBridgeUrl: ws://133.15.97.58:9090
   m_jointStateTopic: /divided_robot/joint_states
   m_robotBaseFrame: LINK_0
   m_trackedJoints:
